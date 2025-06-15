@@ -53,6 +53,7 @@ interface PendingOrdersResponse {
 const PendingSalesReport = () => {
   const router = useRouter();
   const [orders, setOrders] = useState<PendingOrderItem[]>([]);
+  console.log(orders)
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +72,9 @@ const PendingSalesReport = () => {
   const [itemToDelete, setItemToDelete] = useState<PendingOrderItem | null>(null);
   const observer = useRef<IntersectionObserver | null>(null);
   const lastOrderRef = useRef<HTMLDivElement>(null);
+  const [longPressDialogVisible, setLongPressDialogVisible] = useState(false);
+  const [selectedItemForLongPress, setSelectedItemForLongPress] = useState<PendingOrderItem | null>(null);
+  const longPressTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const availableStatuses = [
     { id: 1, name: 'Pending' },
@@ -78,6 +82,31 @@ const PendingSalesReport = () => {
     { id: 3, name: 'Completed' },
     { id: 4, name: 'Cancelled' }
   ];
+
+  const handlePointerDown = (item: PendingOrderItem) => {
+    longPressTimeout.current = setTimeout(() => {
+      setSelectedItemForLongPress(item);
+      setLongPressDialogVisible(true);
+    }, 700); // 700ms for a long press
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimeout.current) {
+      clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+  };
+
+  const handlePointerLeave = () => {
+    if (longPressTimeout.current) {
+      clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
   const fetchPendingOrders = useCallback(async (page: number, perPage: number, loadMore = false) => {
     try {
@@ -340,77 +369,66 @@ const PendingSalesReport = () => {
               key={`${item.order_id}-${item.id}`} 
               className="col-12 md:col-6 lg:col-4"
               ref={index === orders.length - 1 ? lastOrderRef : null}
+              onPointerDown={() => handlePointerDown(item)}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerLeave}
             >
-              <Card className="h-full">
+              <Card 
+                className="h-full cursor-pointer" 
+                onClick={() => viewSalesOrder(item.order_id)}
+              >
                 <div className="flex flex-column gap-2">
-                  <div className="flex justify-content-between align-items-center">
-                    <span className="font-bold">{item.customerName}</span>
-                    <Tag 
-                      value={item.status}
-                      severity={getStatusSeverity(item.status)} 
-                    />
-                  </div>
-                  
-                  <Divider className="my-2" />
-                  
-                  <div className="flex flex-column gap-1">
-                    <div className="flex justify-content-between">
-                      <span className="text-600">Product:</span>
-                      <span>{item.productName}</span>
+                  <div className="flex justify-content-between align-items-start">
+                    <div className="flex align-items-center gap-3">
+                      <div className="flex align-items-center justify-content-center border-round"
+                        style={{ width: '3rem', height: '3rem', backgroundColor: 'var(--surface-200)' }}>
+                        <span className="font-bold text-lg" style={{ color: 'var(--primary-color)' }}>
+                          {getInitials(item.customerName)}
+                        </span>
+                      </div>
+                      <div className="flex flex-column">
+                        <div className="flex align-items-center gap-2">
+                          <i className="pi pi-user" style={{ fontSize: '0.9rem' }} />
+                          <span className="font-medium">{item.customerName}</span>
+                        </div>
+                        <span className="text-sm text-600">Order No: {item.order_id}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-content-between">
-                      <span className="text-600">Reference:</span>
-                      <span>{item.productRef}</span>
-                    </div>
-                    <div className="flex justify-content-between">
-                      <span className="text-600">Delivery Date:</span>
-                      <span>{item.deliveryDate ? formatDate(item.deliveryDate) : 'Not scheduled'}</span>
-                    </div>
-                    <div className="flex justify-content-between">
-                      <span className="text-600">JO Status:</span>
-                     <Tag 
-                        value={item.jobOrderStatus.length > 0 
-                          ? item.jobOrderStatus[0].status_name
-                          : 'Pending'}
-                        severity={getStatusSeverity(item.jobOrderStatus.length > 0 
-                          ? item.jobOrderStatus[0].status_name 
-                          : 'Pending')}
+                    <div className="flex flex-column align-items-end gap-2">
+                      <div className="flex align-items-center gap-1">
+                        <i className="pi pi-compass" style={{ fontSize: '0.9rem' }} />
+                        <span className="text-sm text-600">Stitching</span>
+                      </div>
+                      <Tag
+                        value={"Accepted"}
+                        severity="success"
+                        rounded
+                        style={{ backgroundColor: 'var(--yellow-100)', color: 'var(--yellow-900)', fontWeight: 'bold' }}
                       />
                     </div>
                   </div>
-                  
+
                   <Divider className="my-2" />
-                  
-                  <div className="flex flex-column gap-2 mt-3">
-                    <Button 
-                      label={item.jobOrderStatus.length > 0 ? 'View Job Order' : 'Create Job Order'}
-                      icon={item.jobOrderStatus.length > 0 ? 'pi pi-eye' : 'pi pi-plus'}
-                      onClick={() => handleCreateViewJO(item)}
-                      className={`w-full ${item.jobOrderStatus.length > 0 ? 'p-button-info' : 'p-button-warning'}`}
-                    />
-                    
-                    <Button
-                        label="Change Status"
-                        icon="pi pi-cog"
-                        onClick={() => openStatusChangeDialog(item)}
-                        className="w-full p-button-secondary"
-                    />
-                
-                    <div className="flex gap-2">
-                        <Button 
-                            label="View Sales Order"
-                            icon="pi pi-eye"
-                            onClick={() => viewSalesOrder(item.order_id)}
-                            className="w-full"
-                        />
-                        <Button 
-                            icon="pi pi-trash"
-                            onClick={() => confirmDelete(item)}
-                            className="p-button-danger"
-                            style={{ width: '20%' }}
-                            disabled={item.jobOrderStatus.length > 0 && 
-                              item.jobOrderStatus[item.jobOrderStatus.length - 1].status_name === 'Completed'}
-                        />
+
+                  <div className="flex align-items-center gap-2">
+                    <i className="pi pi-truck" style={{ fontSize: '1rem' }} />
+                    <span className="font-medium">{item.productName}</span>
+                  </div>
+
+                  <Divider className="my-2" />
+
+                  <div className="flex flex-column gap-2">
+                    <div className="flex align-items-center gap-2">
+                      <i className="pi pi-calendar" style={{ fontSize: '0.9rem' }} />
+                      <span className="text-sm text-600">Trial: 11 Jun 2025</span>
+                    </div>
+                    <div className="flex align-items-center gap-2">
+                      <i className="pi pi-calendar" style={{ fontSize: '0.9rem' }} />
+                      <span className="text-sm text-600">Delivery: {item.deliveryDate ? formatDate(item.deliveryDate) : 'Not scheduled'}</span>
+                    </div>
+                    <div className="flex align-items-center gap-2">
+                      <i className="pi pi-clock" style={{ fontSize: '0.9rem' }} />
+                      <span className="text-sm text-600">Received: 12 Jun 2025</span>
                     </div>
                   </div>
                 </div>
@@ -486,33 +504,69 @@ const PendingSalesReport = () => {
       </Sidebar>
 
       <Dialog 
+        header="Order Options" 
+        visible={longPressDialogVisible} 
+        onHide={() => setLongPressDialogVisible(false)}
+        className="w-11 md:w-6 lg:w-4"
+        footer={null}
+      >
+        <div className="flex flex-column gap-3 p-3">
+          <Button
+            label={selectedItemForLongPress?.jobOrderStatus && selectedItemForLongPress.jobOrderStatus.length > 0 ? 'View Job Order' : 'Create Job Order'}
+            icon={(selectedItemForLongPress?.jobOrderStatus?.length ?? 0) > 0 ? 'pi pi-eye' : 'pi pi-plus'}
+            onClick={() => {
+              if (selectedItemForLongPress) handleCreateViewJO(selectedItemForLongPress);
+              setLongPressDialogVisible(false);
+            }}
+            className={`w-full ${(selectedItemForLongPress?.jobOrderStatus?.length ?? 0) > 0 ? 'p-button-info' : 'p-button-warning'}`}
+          />
+          <Button
+            label="Change Status"
+            icon="pi pi-cog"
+            onClick={() => {
+              if (selectedItemForLongPress) openStatusChangeDialog(selectedItemForLongPress);
+              setLongPressDialogVisible(false);
+            }}
+            className="w-full p-button-secondary"
+          />
+          <Button
+            label="View Sales Order"
+            icon="pi pi-eye"
+            onClick={() => {
+              if (selectedItemForLongPress) viewSalesOrder(selectedItemForLongPress.order_id);
+              setLongPressDialogVisible(false);
+            }}
+            className="w-full"
+          />
+          <Button
+            label="Delete Order"
+            icon="pi pi-trash"
+            onClick={() => {
+              if (selectedItemForLongPress) confirmDelete(selectedItemForLongPress);
+              setLongPressDialogVisible(false);
+            }}
+            className="w-full p-button-danger"
+            disabled={(selectedItemForLongPress?.jobOrderStatus?.length ?? 0) > 0 &&
+              selectedItemForLongPress?.jobOrderStatus?.[selectedItemForLongPress?.jobOrderStatus.length - 1]?.status_name === 'Completed'}
+          />
+        </div>
+      </Dialog>
+
+      <Dialog 
         header="Confirm Delete" 
         visible={deleteConfirmVisible} 
         onHide={() => setDeleteConfirmVisible(false)}
-        style={{ width: '90vw', maxWidth: '500px' }}
-      >
-        <div className="flex flex-column gap-3 mt-2">
-          <p>
-            {itemToDelete && orders.filter(o => o.order_id === itemToDelete.order_id).length === 1 
-              ? "This is the only item in the Sales Order. Deleting this will delete the entire Sales Order. Continue?"
-              : "Are you sure you want to delete this item?"}
-          </p>
-          
-          <div className="flex justify-content-end gap-2 mt-3">
-            <Button 
-              label="Cancel" 
-              icon="pi pi-times" 
-              onClick={() => setDeleteConfirmVisible(false)}
-              className="p-button-text"
-            />
-            <Button 
-              label="Delete" 
-              icon="pi pi-trash" 
-              onClick={handleDeleteItem}
-              className="p-button-danger"
-              loading={isSaving}
-            />
+        className="w-11 md:w-6 lg:w-4"
+        footer={(
+          <div>
+            <Button label="No" icon="pi pi-times" onClick={() => setDeleteConfirmVisible(false)} className="p-button-text" />
+            <Button label="Yes" icon="pi pi-check" onClick={handleDeleteItem} autoFocus />
           </div>
+        )}
+      >
+        <div className="flex align-items-center gap-3">
+          <i className="pi pi-exclamation-triangle" style={{ fontSize: '2rem', color: 'var(--red-500)' }} />
+          <span>Are you sure you want to delete this order? This action cannot be undone.</span>
         </div>
       </Dialog>
     </div>

@@ -127,6 +127,9 @@ const SalesOrder = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
   const [images, setImages] = useState<{itemImageSrc: string}[]>([]);
+  const [showAllOrderDetails, setShowAllOrderDetails] = useState(false);
+  const [itemSearchInput, setItemSearchInput] = useState('');
+  const [appliedItemSearch, setAppliedItemSearch] = useState('');
   const [pagination, setPagination] = useState({
     currentPage: 1,
     perPage: 20,
@@ -250,6 +253,7 @@ const SalesOrder = () => {
     try {
       setListLoading(true);
       const res = await SalesOrderService.getSalesOrderById(orderId);
+      console.log('API Response for Order Details:', res);
     
       if (res && res.orderDetails) {
         const detailedOrder: Order = res;
@@ -862,7 +866,12 @@ const SalesOrder = () => {
       )}
 
       <Dialog 
-        header={`Order Details - ${selectedOrder?.docno}`} 
+        header={
+          <div className="flex align-items-center gap-2">
+            <i className="pi pi-arrow-left text-xl cursor-pointer" onClick={handleDialogClose} />
+            <span className="font-bold text-xl">Order Details</span>
+          </div>
+        }
         visible={visible} 
         onHide={handleDialogClose}
         maximized={isMaximized}
@@ -891,171 +900,130 @@ const SalesOrder = () => {
             </div>
           </div>
         ) : selectedOrder ? (
-          <div className="p-fluid mt-3">
-            <div className="grid">
-              <div className="col-6">
-                <div className="field">
-                  <label>Customer</label>
-                  <p className="m-0 font-medium">{selectedOrder?.user?.fname}</p>
-                </div>
+          <div className="p-fluid mt-3 flex flex-column gap-3">
+            <div className="flex flex-column gap-2 p-3 surface-50 border-round">
+              <div className="flex justify-content-between align-items-center">
+                <span className="text-600">Name</span>
+                <span className="font-medium">{selectedOrder?.user?.fname}</span>
+                <Tag value="New" severity="success" />
               </div>
-              <div className="col-6">
-                <div className="field">
-                  <label>Order Date</label>
-                  <p className="m-0 font-medium">{formatDate(new Date(selectedOrder.order_date))}</p>
-                </div>
+              <div className="flex justify-content-between">
+                <span className="text-600">Phone Number</span>
+                <span className="font-medium">{selectedOrder?.user?.admsite_code}</span>
               </div>
-              <div className="col-6">
-                <div className="field">
-                  <label>Status</label>&nbsp;
-                  <Tag 
-                    value={selectedOrder.orderStatus?.status_name || 'Unknown'}
-                    severity={getStatusSeverity(selectedOrder.orderStatus?.status_name) || undefined}
-                    className="text-sm font-semibold"
-                    style={{ minWidth: '6rem', textAlign: 'center' }}
-                  />
-                </div>
-              </div>
-              <div className="col-6">
-                <div className="field">
-                  <label>Trial Date</label>
-                  <p className="m-0 font-medium">{selectedOrder.orderDetails?.some(item => item.trial_date) 
-                    ? formatDate(new Date(selectedOrder.orderDetails.find(item => item.trial_date)?.trial_date || '')) 
-                    : 'Not scheduled'}</p>
-                </div>
-              </div>
-              <div className="col-12">
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    label="Receive Payment"
-                    icon="pi pi-wallet"
-                    onClick={handlePaymentClick}
-                    disabled={selectedOrder?.amt_due === 0 || selectedOrder?.amt_due === undefined}
-                  />
-                  <Button
-                    icon={loadingPaymentHistory ? 'pi pi-spin pi-spinner' : 'pi pi-history'}
-                    style={{ width: '20%' }}
-                    onClick={handleViewPaymentHistory}
-                    className="p-button-secondary"
-                    disabled={loadingPaymentHistory}
-                  />
-                </div>
+              <div className="flex justify-content-between align-items-center">
+                <span className="text-600">Order Number</span>
+                <span className="font-medium text-blue-500 cursor-pointer">{selectedOrder?.docno}</span>
               </div>
             </div>
 
-            <Divider />
-            
-            <h5 className="m-0 mb-3">Order Items</h5>
+            {!showAllOrderDetails && (
+              <div className="flex justify-content-center mt-3">
+                <Button
+                  label="View Details"
+                  icon="pi pi-eye"
+                  onClick={() => setShowAllOrderDetails(true)}
+                  className="w-full"
+                />
+              </div>
+            )}
 
-            {selectedOrder.orderDetails?.map((item) => (
-              <div key={item.id} className="mb-4 surface-50 p-3 border-round">
-                <div className="grid">
-                  <div className="col-6">
-                    <div className="field">
-                      <label>Item Ref</label>
-                      <p className="m-0 font-medium">{item.item_ref || 'Not Available'}</p>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="field">
-                      <label>Job Order No</label>
-                      <p className="m-0 font-medium">{item.order_id}</p>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="field">
-                      <label>Item Name</label>
-                      <p className="m-0 font-medium">{item.material?.name || 'Not Available'}</p>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="field">
-                      <label>Jobber Name</label>
-                      <p className="m-0 font-medium">{item.jobOrderDetails?.[0]?.adminSite?.sitename || 'Not assigned'}</p>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="field">
-                      <label>Trial Date</label>
-                      <p className="m-0 font-medium">
-                        {item.trial_date ? formatDate(new Date(item.trial_date)) : 'Not scheduled'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="field">
-                      <label>Amount</label>
-                      <p className="m-0 font-medium">₹ {item.item_amt || 0}</p>
-                    </div>
-                  </div>
-                  <div className="col-12 mt-2">
-                    <div className="grid align-items-start">
-                      <div className="col-9">
-                        <div className="field">
-                          <label>Notes</label>
-                          <p className="m-0 font-medium">{item.desc1 || 'No Notes Available'}</p>
-                        </div>
-                      </div>
-                      <div className="col-3 flex justify-content-end pt-4">
-                        <Button 
-                          icon="pi pi-pencil" 
-                          onClick={() => handleEditOrderDetail(item)}
-                          className="p-button-rounded p-button"
-                        />
+            {showAllOrderDetails && (
+              <>
+                <h3 className="text-xl mt-0 mb-3">Order Details</h3>
+
+                <div className="p-inputgroup mb-3">
+                  <InputText 
+                    value={itemSearchInput}
+                    onChange={(e) => setItemSearchInput(e.target.value)}
+                    placeholder="Search items (e.g., #Kurta Pajama)"
+                  />
+                  <Button 
+                    label="View" 
+                    icon="pi pi-search" 
+                    onClick={() => setAppliedItemSearch(itemSearchInput)}
+                  />
+                </div>
+
+                {selectedOrder.orderDetails
+                  ?.filter(item => 
+                    item.material?.name?.toLowerCase().includes(appliedItemSearch.toLowerCase()) ||
+                    item.item_ref?.toLowerCase().includes(appliedItemSearch.toLowerCase())
+                  )
+                  .map((item) => (
+                  <Card key={item.id} className="mb-3">
+                    <div className="flex justify-content-between align-items-center mb-2">
+                      <span className="font-medium text-lg text-blue-500">#{item.material?.name || 'N/A'}</span>
+                      <div className="flex gap-2">
+                        <Button icon="pi pi-print" className="p-button-text p-button-sm" />
+                        <Button label="View" className="p-button-text p-button-sm" />
                       </div>
                     </div>
-                  </div>
+                    <div className="flex flex-column gap-1">
+                      <div className="flex justify-content-between">
+                        <span className="text-600">#Kurta Pajama</span>
+                        <span className="font-medium">{item.item_amt || 0}</span>
+                      </div>
+                      <div className="flex justify-content-between">
+                        <span className="text-600">Stitching Cost</span>
+                        <span className="font-medium">1 x ₹{item.item_amt || 0} = ₹{item.item_amt || 0}</span>
+                      </div>
+                      <div className="flex justify-content-between">
+                        <span className="font-bold">Total:</span>
+                        <span className="font-bold">₹{item.item_amt || 0}</span>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
 
-                  <div className="col-12 mt-2">
+                <div className="flex flex-column gap-2 p-3 surface-50 border-round">
+                  <div className="flex justify-content-between align-items-center">
+                    <span className="text-600">Advance Amount</span>
+                    <span className="font-medium text-green-500">₹{selectedOrder?.amt_paid || 0}</span>
+                  </div>
+                  <div className="flex justify-content-between align-items-center">
+                    <span className="text-600">Balance Due</span>
+                    <span className="font-medium text-red-500">₹{selectedOrder?.amt_due || 0}</span>
+                  </div>
+                </div>
+
+                <Divider />
+
+                <h3 className="text-xl mt-0 mb-3">Transactions</h3>
+                <div className="p-4 text-center surface-100 border-round">
+                  <i className="pi pi-search text-3xl mb-1" />
+                  <h4>No Record Found!</h4>
+                </div>
+
+                <div className="grid mt-3">
+                  <div className="col-6">
                     <Button
-                      label={`Status (${item.orderStatus?.status_name || 'Unknown'})`}
-                      icon="pi pi-sync"
-                      onClick={() => {
-                        setSelectedDetail(item);
-                        setStatusSidebarVisible(true);
-                      }}
-                      severity={getStatusSeverity(item.orderStatus?.status_name) || undefined}
+                      label="Send Bill"
+                      icon="pi pi-whatsapp"
+                      className="p-button-success w-full"
                     />
                   </div>
-
-                  {item?.image_url && item.image_url.length > 0 && (
-                    <div className="col-12 mt-2">
-                      <Button 
-                        label={`View Images (${item.image_url.length})`} 
-                        icon="pi pi-image" 
-                        className="p-button-outlined"
-                        onClick={() => handleImagePreview(item.image_url)}
-                      />
-                    </div>
-                  )}
-
-                  <div className="col-12 mt-2">
-                    <Button 
-                      label="View Measurement Details" 
-                      icon="pi pi-eye" 
-                      className="p-button-outlined"
-                      onClick={() => handleViewMeasurement(item)}
+                  <div className="col-6">
+                    <Button
+                      label="Print Bill"
+                      icon="pi pi-print"
+                      className="p-button-outlined w-full"
                     />
                   </div>
-
-                  <div className="col-12 mt-2">
-                    <Button 
-                      label="Update Status"
-                      icon="pi pi-pencil" 
-                      onClick={() => openItemActionSidebar(item)}
+                  <div className="col-12 mt-3">
+                    <Button
+                      label="Receive Payment"
+                      icon="pi pi-wallet"
+                      onClick={handlePaymentClick}
+                      disabled={selectedOrder?.amt_due === 0 || selectedOrder?.amt_due === undefined}
                       className="w-full"
                     />
                   </div>
-                  <Divider />
                 </div>
-              </div>
-            ))}
+              </>
+            )}
           </div>
-        ) : (
-          <div className="flex justify-content-center align-items-center" style={{ height: '200px' }}>
-            <p>No order details available</p>
-          </div>
-        )}
+        ) : null}
       </Dialog>
 
       <Dialog 

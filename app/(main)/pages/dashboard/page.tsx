@@ -23,7 +23,7 @@ const Dashboard = () => {
         orderDetailsThisWeek: [] as { admsite_code: string; sitename: string; count: number }[],
         jobOrderDetailsThisWeek: [] as { admsite_code: string; sitename: string; count: number }[]
     });
-
+  console.log('Dashboard Data:', dashboardData);
     const deliveryData: ChartData = {
         labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         datasets: [
